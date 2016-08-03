@@ -23,23 +23,20 @@
 }
 
 #pragma mark - Animation
-
 - (void)growTapCircle
 {
     //NSLog(@"expanding a tap circle");
-    // Spawn a growing circle that "ripples" through the button:
-    
-    // Set the fill color for the tap circle (self.animationLayer's fill color):
-    UIColor *tapCircleColor = [UIColor blackColor];
+    UIColor *tapCircleColor = [UIColor colorWithRed:0 green:216.0/255.f blue:201.f/255.f alpha:1];
     
     // Calculate the tap circle's ending diameter:
-    CGFloat tapCircleFinalDiameter = [self calculateTapCircleFinalDiameter];
+    CGFloat tapCircleFinalDiameter = [UIScreen mainScreen].bounds.size.height * 2.2;
     
     // Create a UIView which we can modify for its frame value later (specifically, the ability to use .center):
     UIView *tapCircleLayerSizerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tapCircleFinalDiameter, tapCircleFinalDiameter)];
-    tapCircleLayerSizerView.center = self.startButton.center;
+    tapCircleLayerSizerView.center = CGPointMake([UIScreen mainScreen].bounds.size.width * 0.5, [UIScreen mainScreen].bounds.size.height - (49 - 10.5));
+    
     // Calculate starting path:
-    CGFloat tapCircleDiameterStartValue = 25;
+    CGFloat tapCircleDiameterStartValue = 5.f;
     UIView *startingRectSizerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tapCircleDiameterStartValue, tapCircleDiameterStartValue)];
     startingRectSizerView.center = tapCircleLayerSizerView.center;
     
@@ -47,8 +44,9 @@
     UIBezierPath *startingCirclePath = [UIBezierPath bezierPathWithRoundedRect:startingRectSizerView.frame cornerRadius:tapCircleDiameterStartValue / 2.f];
     
     // Calculate ending path:
-    UIView *endingRectSizerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tapCircleFinalDiameter, tapCircleFinalDiameter)];
-    endingRectSizerView.center = tapCircleLayerSizerView.center;
+    UIView *endingRectSizerView = [[UIView alloc] initWithFrame:CGRectMake(0, [UIScreen mainScreen].bounds.size.height * 0.5, tapCircleFinalDiameter, tapCircleFinalDiameter)];
+//    endingRectSizerView.center = tapCircleLayerSizerView.center;
+    endingRectSizerView.center = CGPointMake([UIScreen mainScreen].bounds.size.width * 0.5, [UIScreen mainScreen].bounds.size.height * 0.5);
     
     // Create ending circle path:
     UIBezierPath *endingCirclePath = [UIBezierPath bezierPathWithRoundedRect:endingRectSizerView.frame cornerRadius:tapCircleFinalDiameter / 2.f];
@@ -61,10 +59,9 @@
     tapCircle.borderWidth = 0;
     tapCircle.path = startingCirclePath.CGPath;
     
-    CGRect fadeAndClippingMaskRect = [UIScreen mainScreen].bounds;
-
     // Create a mask if we are not going to ripple over bounds:
     CAShapeLayer *mask = [CAShapeLayer layer];
+    CGRect fadeAndClippingMaskRect = [UIScreen mainScreen].bounds;
     mask.path = [UIBezierPath bezierPathWithRoundedRect:fadeAndClippingMaskRect cornerRadius:[UIApplication sharedApplication].keyWindow.layer.cornerRadius].CGPath;
     mask.fillColor = [UIColor blackColor].CGColor;
     mask.strokeColor = [UIColor clearColor].CGColor;
@@ -74,34 +71,54 @@
     // Set tap circle layer's mask to the mask:
     tapCircle.mask = mask;
     
-    // Add tap circle to array and view:
-//    [self.rippleAnimationQueue addObject:tapCircle];
-    [[UIApplication sharedApplication].keyWindow.layer insertSublayer:tapCircle atIndex:0]; //above:self.backgroundColorFadeLayer];
-    
-    CGFloat touchDownAnimationDuration = 0.3;
+    CGFloat touchDownAnimationDuration = .3f;
     
     // Grow tap-circle animation (performed on mask layer):
     CABasicAnimation *tapCircleGrowthAnimation = [CABasicAnimation animationWithKeyPath:@"path"];
     tapCircleGrowthAnimation.delegate = self;
     tapCircleGrowthAnimation.duration = touchDownAnimationDuration;
-    tapCircleGrowthAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
+    tapCircleGrowthAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
     tapCircleGrowthAnimation.fromValue = (__bridge id)startingCirclePath.CGPath;
     tapCircleGrowthAnimation.toValue = (__bridge id)endingCirclePath.CGPath;
     tapCircleGrowthAnimation.fillMode = kCAFillModeForwards;
     tapCircleGrowthAnimation.removedOnCompletion = NO;
     
-    // Fade in self.animationLayer:
-    CABasicAnimation *fadeIn = [CABasicAnimation animationWithKeyPath:@"opacity"];
-    fadeIn.duration = touchDownAnimationDuration;
-    fadeIn.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
-    fadeIn.fromValue = [NSNumber numberWithFloat:0.f];
-    fadeIn.toValue = [NSNumber numberWithFloat:1.f];
-    fadeIn.fillMode = kCAFillModeForwards;
-    fadeIn.removedOnCompletion = NO;
+    CABasicAnimation *fadeOut = [CABasicAnimation animationWithKeyPath:@"opacity"];
+    fadeOut.duration = touchDownAnimationDuration;
+    fadeOut.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
+    fadeOut.fromValue = [NSNumber numberWithFloat:1.f];
+    fadeOut.toValue = [NSNumber numberWithFloat:0.f];
+    fadeOut.fillMode = kCAFillModeForwards;
+    fadeOut.removedOnCompletion = NO;
+    fadeOut.beginTime = CACurrentMediaTime() + touchDownAnimationDuration;
+    
+    if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)]) {
+        UIGraphicsBeginImageContextWithOptions([UIApplication sharedApplication].keyWindow.bounds.size, NO, [UIScreen mainScreen].scale);
+    } else {
+        UIGraphicsBeginImageContext([UIApplication sharedApplication].keyWindow.bounds.size);
+    }
+    
+    [[UIApplication sharedApplication].keyWindow.layer renderInContext:UIGraphicsGetCurrentContext()];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    CALayer *imageLayer = [[CALayer alloc] init];
+    imageLayer.frame = [UIScreen mainScreen].bounds;
+    imageLayer.contents = (__bridge id _Nullable)(image.CGImage);
+    
+    [[UIApplication sharedApplication].keyWindow.layer addSublayer:imageLayer];
+    [[UIApplication sharedApplication].keyWindow.layer addSublayer:tapCircle];
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((touchDownAnimationDuration) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [imageLayer removeFromSuperlayer];
+    });
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((touchDownAnimationDuration * 2) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [tapCircle removeFromSuperlayer];
+    });
     
     // Add the animations to the layers:
     [tapCircle addAnimation:tapCircleGrowthAnimation forKey:@"animatePath"];
-    [tapCircle addAnimation:fadeIn forKey:@"opacityAnimation"];
+    [tapCircle addAnimation:fadeOut forKey:@"fadeOut"];
 }
 
 - (CGFloat)calculateTapCircleFinalDiameter
